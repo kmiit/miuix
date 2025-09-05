@@ -20,7 +20,7 @@ val outputDir = layout.projectDirectory.dir("../../build/icon-svgs").asFile
 tasks.register<JavaExec>("generateIconSvgs") {
     group = "documentation"
     description = "Scan ImageVector in top.yukonga.miuix.kmp.icon.icons and export SVGs"
-    val mainClassName = "top.yukonga.miuix.tools.iconsvg.MainKt"
+    val mainClassName = "top.yukonga.miuix.icongen.MainKt"
 
     dependsOn(tasks.named("jvmJar"))
 
