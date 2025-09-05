@@ -5,7 +5,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 
 plugins {
-    alias(libs.plugins.android.library)
+    // alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.jetbrains.compose)
     alias(libs.plugins.jetbrains.dokka)
@@ -14,9 +14,9 @@ plugins {
     id("module.publication")
 }
 
-android {
-    namespace = "top.yukonga.miuix.kmp"
-}
+// android {
+//     namespace = "top.yukonga.miuix.kmp"
+// }
 
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -27,9 +27,9 @@ kotlin {
 
     jvmToolchain(21)
 
-    androidTarget {
-        publishLibraryVariants("release")
-    }
+    // androidTarget {
+    //     publishLibraryVariants("release")
+    // }
 
     jvm("desktop")
 
@@ -54,10 +54,10 @@ kotlin {
     }
 
     sourceSets {
-        androidMain.dependencies {
-            implementation(libs.androidx.activity) // Android BackHandler
-            implementation(libs.androidx.window) // Android WindowMetrics
-        }
+        // androidMain.dependencies {
+        //     implementation(libs.androidx.activity) // Android BackHandler
+        //     implementation(libs.androidx.window) // Android WindowMetrics
+        // }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
