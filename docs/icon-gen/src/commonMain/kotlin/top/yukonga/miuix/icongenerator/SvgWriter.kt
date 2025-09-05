@@ -1,4 +1,4 @@
-package top.yukonga.miuix.svggen
+package top.yukonga.miuix.icongen
 
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color

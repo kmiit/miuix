@@ -3,6 +3,7 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
@@ -80,7 +81,7 @@ spotless {
 
 tasks.matching { it.name.startsWith("dokka") }.configureEach {
     // 生成 SVG（输出到 root/build/icon-svgs）
-    dependsOn(tasks.getByPath(":docs:svg-gen:generateIconSvgs"))
+    dependsOn(tasks.getByPath(":docs:icon-gen:generateIconSvgs"))
 }
 
 val copyIconSvgsToDokka by tasks.register<Copy>("copyIconSvgsToDokka") {
@@ -90,6 +91,6 @@ val copyIconSvgsToDokka by tasks.register<Copy>("copyIconSvgsToDokka") {
     into(toDir)
 }
 
-tasks.named("dokkaHtml").configure {
+tasks.named("dokkaGenerate").configure {
     finalizedBy(copyIconSvgsToDokka)
 }

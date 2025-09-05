@@ -1,4 +1,4 @@
-package top.yukonga.miuix.tools.svggen
+package top.yukonga.miuix.icongen
 
 import io.github.classgraph.ClassGraph
 import androidx.compose.ui.graphics.vector.ImageVector
