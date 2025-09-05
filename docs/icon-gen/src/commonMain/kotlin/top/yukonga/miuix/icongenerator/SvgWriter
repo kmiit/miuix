@@ -1,0 +1,166 @@
+package top.yukonga.miuix.svggen
+
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.*
+import java.io.File
+import java.lang.StringBuilder
+import kotlin.math.round
+
+object SvgWriter {
+    fun write(iv: ImageVector, out: File, name: String = "icon") {
+        out.parentFile?.mkdirs()
+        out.writeText(toSvg(iv, name))
+    }
+
+    fun toSvg(iv: ImageVector, name: String = "icon"): String {
+        val w = trim(iv.defaultWidth.value)
+        val h = trim(iv.defaultHeight.value)
+        val vw = trim(iv.viewportWidth)
+        val vh = trim(iv.viewportHeight)
+
+        val sb = StringBuilder()
+        sb.append("""<svg xmlns="http://www.w3.org/2000/svg" width="$w" height="$h" viewBox="0 0 $vw $vh" fill="none" aria-label="$name">""")
+        sb.append('\n')
+
+        iv.root.children.forEach { child ->
+            appendNode(sb, child, indent = "  ")
+        }
+
+        sb.append("</svg>\n")
+        return sb.toString()
+    }
+
+    private fun appendNode(sb: StringBuilder, node: VectorNode, indent: String) {
+        when (node) {
+            is VectorGroup -> appendGroup(sb, node, indent)
+            is VectorPath -> appendPath(sb, node, indent)
+            else -> { /* ignore */ }
+        }
+    }
+
+    private fun appendGroup(sb: StringBuilder, g: VectorGroup, indent: String) {
+        val attrs = mutableListOf<String>()
+        transformAttr(g)?.let { attrs += it }
+        // 简化：clipPathData 暂不导出（可扩展为 <clipPath> + url(#id)）
+        sb.append(indent).append("<g")
+        if (attrs.isNotEmpty()) {
+            sb.append(' ').append(attrs.joinToString(" "))
+        }
+        sb.append(">\n")
+        g.children.forEach { child ->
+            appendNode(sb, child, indent + "  ")
+        }
+        sb.append(indent).append("</g>\n")
+    }
+
+    private fun appendPath(sb: StringBuilder, p: VectorPath, indent: String) {
+        val d = pathDataToString(p.pathData)
+        val attrs = mutableListOf<String>()
+        attrs += """d="$d""""
+        p.fill?.let { brush ->
+            when (brush) {
+                is SolidColor -> attrs += """fill="${colorToHex(brush.value, p.fillAlpha)}""""
+                // 其它 Brush 暂不支持，降级为填充当前色或 none
+                else -> attrs += """fill="currentColor""""
+            }
+        } ?: attrs.add("""fill="none"""")
+        p.stroke?.let { brush ->
+            when (brush) {
+                is SolidColor -> attrs += """stroke="${colorToHex(brush.value, p.strokeAlpha)}""""
+                else -> attrs += """stroke="currentColor""""
+            }
+            attrs += """stroke-width="${trim(p.strokeLineWidth)}""""
+            attrs += """stroke-linecap="${capToSvg(p.strokeLineCap)}""""
+            attrs += """stroke-linejoin="${joinToSvg(p.strokeLineJoin)}""""
+            attrs += """stroke-miterlimit="${trim(p.strokeLineMiter)}""""
+        }
+        attrs += """fill-rule="${fillTypeToSvg(p.fillRule)}""""
+        sb.append(indent).append("<path ").append(attrs.joinToString(" ")).append("/>\n")
+    }
+
+    private fun pathDataToString(list: List<PathNode>): String =
+        buildString {
+            list.forEach { n ->
+                when (n) {
+                    is PathNode.MoveTo -> append("M ${trim(n.x)} ${trim(n.y)} ")
+                    is PathNode.RelativeMoveTo -> append("m ${trim(n.dx)} ${trim(n.dy)} ")
+                    is PathNode.LineTo -> append("L ${trim(n.x)} ${trim(n.y)} ")
+                    is PathNode.RelativeLineTo -> append("l ${trim(n.dx)} ${trim(n.dy)} ")
+                    is PathNode.HorizontalTo -> append("H ${trim(n.x)} ")
+                    is PathNode.RelativeHorizontalTo -> append("h ${trim(n.dx)} ")
+                    is PathNode.VerticalTo -> append("V ${trim(n.y)} ")
+                    is PathNode.RelativeVerticalTo -> append("v ${trim(n.dy)} ")
+                    is PathNode.CurveTo -> append("C ${trim(n.x1)} ${trim(n.y1)} ${trim(n.x2)} ${trim(n.y2)} ${trim(n.x3)} ${trim(n.y3)} ")
+                    is PathNode.RelativeCurveTo -> append("c ${trim(n.dx1)} ${trim(n.dy1)} ${trim(n.dx2)} ${trim(n.dy2)} ${trim(n.dx3)} ${trim(n.dy3)} ")
+                    is PathNode.ReflectiveCurveTo -> append("S ${trim(n.x1)} ${trim(n.y1)} ${trim(n.x2)} ${trim(n.y2)} ")
+                    is PathNode.RelativeReflectiveCurveTo -> append("s ${trim(n.dx1)} ${trim(n.dy1)} ${trim(n.dx2)} ${trim(n.dy2)} ")
+                    is PathNode.QuadTo -> append("Q ${trim(n.x1)} ${trim(n.y1)} ${trim(n.x2)} ${trim(n.y2)} ")
+                    is PathNode.RelativeQuadTo -> append("q ${trim(n.dx1)} ${trim(n.dy1)} ${trim(n.dx2)} ${trim(n.dy2)} ")
+                    is PathNode.ReflectiveQuadTo -> append("T ${trim(n.x)} ${trim(n.y)} ")
+                    is PathNode.RelativeReflectiveQuadTo -> append("t ${trim(n.dx)} ${trim(n.dy)} ")
+                    is PathNode.ArcTo -> append("A ${trim(n.rx)} ${trim(n.ry)} ${trim(n.theta)} ${if (n.isMoreThanHalf) 1 else 0} ${if (n.isPositiveArc) 1 else 0} ${trim(n.x)} ${trim(n.y)} ")
+                    is PathNode.RelativeArcTo -> append("a ${trim(n.rx)} ${trim(n.ry)} ${trim(n.theta)} ${if (n.isMoreThanHalf) 1 else 0} ${if (n.isPositiveArc) 1 else 0} ${trim(n.dx)} ${trim(n.dy)} ")
+                    is PathNode.Close -> append("Z ")
+                }
+            }
+        }.trim()
+
+    private fun transformAttr(g: VectorGroup): String? {
+        val parts = mutableListOf<String>()
+        if (g.translationX != 0f || g.translationY != 0f) {
+            parts += "translate(${trim(g.translationX)} ${trim(g.translationY)})"
+        }
+        if (g.rotation != 0f) {
+            if (g.pivotX != 0f || g.pivotY != 0f) {
+                parts += "rotate(${trim(g.rotation)} ${trim(g.pivotX)} ${trim(g.pivotY)})"
+            } else {
+                parts += "rotate(${trim(g.rotation)})"
+            }
+        }
+        if (g.scaleX != 1f || g.scaleY != 1f) {
+            parts += "scale(${trim(g.scaleX)} ${trim(g.scaleY)})"
+        }
+        return if (parts.isEmpty()) null else """transform="${parts.joinToString(" ")}""""
+    }
+
+    private fun colorToHex(c: Color, alphaOverride: Float? = null): String {
+        val a = ((alphaOverride ?: c.alpha) * 255f).coerceIn(0f, 255f)
+        val argb = (c.copy(alpha = a / 255f).toArgb())
+        val aHex = String.format("%02x", (argb ushr 24) and 0xFF)
+        val rHex = String.format("%02x", (argb ushr 16) and 0xFF)
+        val gHex = String.format("%02x", (argb ushr 8) and 0xFF)
+        val bHex = String.format("%02x", (argb) and 0xFF)
+        return "#$rHex$gHex$bHex${if (aHex != "ff") aHex else ""}"
+    }
+
+    private fun capToSvg(c: StrokeCap): String = when (c) {
+        StrokeCap.Butt -> "butt"
+        StrokeCap.Round -> "round"
+        StrokeCap.Square -> "square"
+        else -> "butt"
+    }
+
+    private fun joinToSvg(j: StrokeJoin): String = when (j) {
+        StrokeJoin.Miter -> "miter"
+        StrokeJoin.Round -> "round"
+        StrokeJoin.Bevel -> "bevel"
+        else -> "miter"
+    }
+
+    private fun fillTypeToSvg(f: PathFillType): String = when (f) {
+        PathFillType.EvenOdd -> "evenodd"
+        PathFillType.NonZero -> "nonzero"
+        else -> "nonzero"
+    }
+
+    private fun trim(v: Float): String {
+        val d = round(v * 1000f) / 1000f
+        return if (d == d.toInt().toFloat()) d.toInt().toString() else d.toString()
+    }
+}

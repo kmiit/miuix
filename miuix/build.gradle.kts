@@ -77,3 +77,19 @@ spotless {
         licenseHeaderFile(rootProject.file("./spotless/copyright.txt"), "(^(?![\\/ ]\\**).*$)")
     }
 }
+
+tasks.matching { it.name.startsWith("dokka") }.configureEach {
+    // 生成 SVG（输出到 root/build/icon-svgs）
+    dependsOn(tasks.getByPath(":docs:svg-gen:generateIconSvgs"))
+}
+
+val copyIconSvgsToDokka by tasks.register<Copy>("copyIconSvgsToDokka") {
+    val fromDir = rootProject.layout.buildDirectory.dir("icon-svgs")
+    val toDir = layout.buildDirectory.dir("dokka/html/icons")
+    from(fromDir)
+    into(toDir)
+}
+
+tasks.named("dokkaHtml").configure {
+    finalizedBy(copyIconSvgsToDokka)
+}
